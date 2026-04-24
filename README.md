@@ -144,12 +144,4 @@ hello, 1->2, A->
 * **Frontend:** HTML, CSS, JavaScript
 * **Deployment:** Render (backend), Vercel (frontend)
 
----
 
-## ✅ Status
-
-✔ Fully functional
-✔ Deployed and tested
-✔ Ready for evaluation
-
----
