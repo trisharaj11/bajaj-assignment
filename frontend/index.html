@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BFHL — Graph Explorer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Design tokens ── */
+    :root {
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --border: #1e1e2e;
+      --border-bright: #2e2e4a;
+      --accent: #7c6af7;
+      --accent2: #f77c9f;
+      --green: #4ade80;
+      --yellow: #fbbf24;
+      --red: #f87171;
+      --text: #e2e0f5;
+      --muted: #5c5a78;
+      --mono: 'Space Mono', monospace;
+      --sans: 'Syne', sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 48px 48px;
+      opacity: 0.4;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 48px 24px 80px;
+    }
+
+    /* ── Header ── */
+    header {
+      margin-bottom: 48px;
+      animation: fadeDown 0.6s ease both;
+    }
+
+    .badge {
+      display: inline-block;
+      background: rgba(124,106,247,0.15);
+      border: 1px solid rgba(124,106,247,0.4);
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 4px;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+    }
+
+    h1 span { color: var(--accent); }
+
+    .subtitle {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 10px;
+      letter-spacing: 0.05em;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px;
+      margin-bottom: 24px;
+      animation: fadeUp 0.6s ease both;
+    }
+
+    .card-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    /* ── Input ── */
+    textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border-bright);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.7;
+      padding: 16px;
+      resize: vertical;
+      min-height: 130px;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+
+    textarea:focus { border-color: var(--accent); }
+    textarea::placeholder { color: var(--muted); }
+
+    .hint {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    /* ── Buttons ── */
+    .btn-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      font-family: var(--sans);
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      padding: 12px 24px;
+      transition: all 0.15s;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      flex: 1;
+    }
+    .btn-primary:hover { background: #9180ff; transform: translateY(-1px); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border-bright);
+    }
+    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Status bar ── */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-family: var(--mono);
+      font-size: 12px;
+      margin-bottom: 24px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .status-bar.visible { opacity: 1; }
+    .status-bar.loading { background: rgba(124,106,247,0.1); border: 1px solid rgba(124,106,247,0.3); color: var(--accent); }
+    .status-bar.success { background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.3); color: var(--green); }
+    .status-bar.error   { background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.3); color: var(--red); }
+
+    .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+      flex-shrink: 0;
+    }
+    .dot.pulse { animation: pulse 1s ease infinite; }
+
+    /* ── Summary chips ── */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 24px;
+      animation: fadeUp 0.4s ease both 0.1s;
+    }
+
+    .chip {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .chip-value {
+      font-size: 2rem;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .chip-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    /* ── Hierarchy cards ── */
+    .tree-grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      margin-bottom: 24px;
+    }
+
+    .tree-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      animation: fadeUp 0.4s ease both;
+    }
+
+    .tree-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tree-root-label {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .tree-meta { display: flex; gap: 6px; align-items: center; }
+
+    .tag {
+      font-family: var(--mono);
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .tag-depth { background: rgba(74,222,128,0.1); color: var(--green); border: 1px solid rgba(74,222,128,0.2); }
+    .tag-cycle { background: rgba(248,113,113,0.1); color: var(--red); border: 1px solid rgba(248,113,113,0.2); }
+
+    .tree-body { padding: 14px 16px; }
+
+    /* Tree visual */
+    .tree-visual {
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.8;
+      color: var(--text);
+    }
+
+    .tree-line { display: flex; align-items: center; gap: 6px; }
+    .tree-connector { color: var(--muted); }
+    .tree-node-name {
+      background: rgba(124,106,247,0.1);
+      border: 1px solid rgba(124,106,247,0.2);
+      color: var(--accent);
+      padding: 1px 8px;
+      border-radius: 4px;
+      font-weight: 700;
+    }
+    .tree-node-name.leaf { background: rgba(74,222,128,0.08); border-color: rgba(74,222,128,0.2); color: var(--green); }
+
+    /* ── Tags section (invalid / duplicate) ── */
+    .tags-section { margin-bottom: 24px; }
+
+    .section-header {
+      font-family: var(--mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .tag-list { display: flex; flex-wrap: wrap; gap: 8px; }
+
+    .entry-tag {
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 4px 12px;
+      border-radius: 6px;
+    }
+
+    .entry-tag.invalid { background: rgba(248,113,113,0.1); color: var(--red); border: 1px solid rgba(248,113,113,0.25); }
+    .entry-tag.duplicate { background: rgba(251,191,36,0.1); color: var(--yellow); border: 1px solid rgba(251,191,36,0.25); }
+
+    /* ── Raw JSON toggle ── */
+    .json-block {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      font-family: var(--mono);
+      font-size: 11px;
+      line-height: 1.7;
+      max-height: 320px;
+      overflow-y: auto;
+      white-space: pre;
+      color: var(--muted);
+    }
+
+    /* ── Animations ── */
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
+
+    @media (max-width: 600px) {
+      .summary-grid { grid-template-columns: 1fr 1fr; }
+      .summary-grid .chip:last-child { grid-column: span 2; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <header>
+    <div class="badge">POST /bfhl</div>
+    <h1>Graph <span>Explorer</span></h1>
+    <p class="subtitle">Hierarchy Processor</p>
+  </header>
+
+  <!-- Input card -->
+  <div class="card" style="animation-delay:0.05s">
+    <div class="card-label">Input — Node Edge List</div>
+    <textarea id="inputArea"
+      placeholder='Enter edges, one per line or comma-separated&#10;e.g.  A->B, A->C, B->D, X->Y, Y->Z, Z->X'
+    ></textarea>
+    <p class="hint">Each edge: single uppercase letter → single uppercase letter. Self-loops, blanks, and bad formats are detected automatically.</p>
+    <div class="btn-row">
+      <button class="btn-primary" id="submitBtn" onclick="submitData()">
+        ▶ &nbsp; Process Graph
+      </button>
+      <button class="btn-secondary" onclick="loadExample()">Load Example</button>
+      <button class="btn-secondary" onclick="clearAll()">Clear</button>
+    </div>
+  </div>
+
+  <div class="status-bar" id="statusBar">
+    <div class="dot" id="statusDot"></div>
+    <span id="statusText"></span>
+  </div>
+
+  <div id="results" style="display:none">
+
+    <!-- Summary -->
+    <div class="summary-grid" id="summaryGrid"></div>
+
+    <!-- Hierarchies -->
+    <div class="card-label" style="margin-bottom:12px; animation: fadeUp .4s ease both">Hierarchies</div>
+    <div class="tree-grid" id="treeGrid"></div>
+
+    <!-- Invalid & Duplicate -->
+    <div class="tags-section" id="tagsSection"></div>
+
+    <!-- Raw JSON -->
+    <div class="card" style="animation-delay:0.3s">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <div class="card-label" style="margin:0">Raw JSON Response</div>
+        <button class="btn-secondary" style="padding:6px 14px; font-size:11px;" onclick="copyJSON()">Copy</button>
+      </div>
+      <div class="json-block" id="jsonBlock"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const API_URL="http://localhost:3000/bfhl";
+
+let responseCache=null;
+
+function showStatus(type,msg){
+  const bar=document.getElementById("statusBar");
+  const dot=document.getElementById("statusDot");
+  const text=document.getElementById("statusText");
+
+  bar.className="status-bar "+(type?("visible "+type):"");
+  dot.className="dot "+(type==="loading"?"pulse":"");
+  text.textContent=msg;
+}
+
+function resetUI(){
+  document.getElementById("results").style.display="none";
+  showStatus("","");
+}
+
+function loadExample(){
+  document.getElementById("inputArea").value="A->B, A->C, B->D";
+}
+
+function clearAll(){
+  document.getElementById("inputArea").value="";
+  resetUI();
+}
+
+function copyJSON(){
+  if(!responseCache)return;
+  navigator.clipboard.writeText(JSON.stringify(responseCache,null,2));
+}
+
+function parseInput(text){
+  const arr=text.split(/[\n,]+/);
+  const cleaned=[];
+
+  for(let item of arr){
+    let val=item.trim();
+    val=val.replace(/^["']|["']$/g,"");
+    if(val.length>0)cleaned.push(val);
+  }
+
+  return cleaned;
+}
+
+async function submitData(){
+  const raw=document.getElementById("inputArea").value.trim();
+  if(!raw){
+    alert("Enter some edges first");
+    return;
+  }
+
+  const data=parseInput(raw);
+
+  if(data.length>1000){
+    alert("Too many edges");
+    return;
+  }
+
+  const btn=document.getElementById("submitBtn");
+  btn.disabled=true;
+  btn.innerText="Processing...";
+
+  showStatus("loading","Sending request...");
+  resetUI();
+
+  try{
+    const res=await fetch(API_URL,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({data:data})
+    });
+
+    if(!res.ok){
+      const txt=await res.text();
+      throw new Error(txt||("Error "+res.status));
+    }
+
+    const result=await res.json();
+    responseCache=result;
+
+    showStatus("success",`${data.length} edges processed, ${result.hierarchies.length} groups`);
+
+    displaySummary(result.summary);
+    displayTrees(result.hierarchies);
+    displayTags(result.invalid_entries,result.duplicate_edges);
+
+    document.getElementById("jsonBlock").textContent=JSON.stringify(result,null,2);
+    document.getElementById("results").style.display="block";
+
+  }catch(e){
+    showStatus("error","API Error: "+e.message);
+  }finally{
+    btn.disabled=false;
+    btn.innerHTML="▶ Process Graph";
+  }
+}
+
+function displaySummary(sum){
+  const grid=document.getElementById("summaryGrid");
+
+  const list=[
+    {name:"Valid Trees",val:sum.total_trees,color:"var(--green)"},
+    {name:"Cycles",val:sum.total_cycles,color:"var(--red)"},
+    {name:"Largest Root",val:sum.largest_tree_root||"-",color:"var(--accent)"}
+  ];
+
+  let html="";
+
+  for(let item of list){
+    html+=`
+      <div class="chip">
+        <div class="chip-value" style="color:${item.color}">${item.val}</div>
+        <div class="chip-label">${item.name}</div>
+      </div>
+    `;
+  }
+
+  grid.innerHTML=html;
+}
+
+function displayTrees(arr){
+  const grid=document.getElementById("treeGrid");
+  let html="";
+
+  arr.forEach((obj,i)=>{
+    html+=`
+      <div class="tree-card">
+        <div class="tree-card-header">
+          <span class="tree-root-label">Root: ${obj.root}</span>
+          <div class="tree-meta">
+            ${
+              obj.has_cycle
+              ? `<span class="tag tag-cycle">Cycle</span>`
+              : `<span class="tag tag-depth">depth ${obj.depth}</span>`
+            }
+          </div>
+        </div>
+        <div class="tree-body">
+          ${
+            obj.has_cycle
+            ? `<div style="color:var(--red);font-family:var(--mono);font-size:12px;">Cycle detected</div>`
+            : `<div class="tree-visual">${drawTree(obj.root,obj.tree[obj.root],0)}</div>`
+          }
+        </div>
+      </div>
+    `;
+  });
+
+  grid.innerHTML=html;
+}
+
+function drawTree(name,children,level){
+  const pad="&nbsp;".repeat(level*4);
+  let html=`<div class="tree-line">${level>0?`<span class="tree-connector">${pad}└─</span>`:""}<span class="tree-node-name">${name}</span></div>`;
+
+  if(children){
+    for(let key in children){
+      html+=drawTree(key,children[key],level+1);
+    }
+  }
+
+  return html;
+}
+
+function displayTags(invalid,duplicate){
+  const sec=document.getElementById("tagsSection");
+  let html="";
+
+  if(invalid&&invalid.length){
+    html+=`
+      <div class="section-header">Invalid (${invalid.length})</div>
+      <div class="tag-list">
+        ${invalid.map(x=>`<span class="entry-tag invalid">${x||'""'}</span>`).join("")}
+      </div>
+    `;
+  }
+
+  if(duplicate&&duplicate.length){
+    html+=`
+      <div class="section-header">Duplicates (${duplicate.length})</div>
+      <div class="tag-list">
+        ${duplicate.map(x=>`<span class="entry-tag duplicate">${x}</span>`).join("")}
+      </div>
+    `;
+  }
+
+  sec.innerHTML=html;
+}
+</script>
+</body>
+</html>
